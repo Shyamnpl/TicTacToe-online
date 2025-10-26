@@ -68,17 +68,6 @@ const tabContents = document.querySelectorAll('.tab-content');
 const notificationBadge = document.getElementById("notificationBadge");
 const browseTabButton = document.getElementById("browseTabButton");
 const matchWinner = document.getElementById("matchWinner");
-// ... baaki DOM elements ...
-const createRoomModal = document.getElementById("createRoomModal");
-const passwordModal = document.getElementById("passwordModal");
-const roomNameInput = document.getElementById("roomNameInput");
-const roomPasswordInput = document.getElementById("roomPasswordInput");
-const createRoomSubmitBtn = document.getElementById("createRoomSubmitBtn");
-const passwordPromptInput = document.getElementById("passwordPromptInput");
-const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
-const closeCreateModal = document.getElementById("closeCreateModal");
-const closePasswordModal = document.getElementById("closePasswordModal");
-const passwordError = document.getElementById("passwordError");
 
 // Game state
 let board = Array(9).fill(null);
@@ -118,11 +107,7 @@ function init() {
 
     // Event listeners
     modeEl.addEventListener("change", handleModeChange);
-  //  createBtn.addEventListener("click", createRoom);
-    createBtn.addEventListener("click", () => createRoomModal.style.display = "block");
-    closeCreateModal.addEventListener("click", () => createRoomModal.style.display = "none");
-    createRoomSubmitBtn.addEventListener("click", handleCreateRoomSubmit);
-    closePasswordModal.addEventListener("click", () => passwordModal.style.display = "none");
+    createBtn.addEventListener("click", createRoom);
     joinBtn.addEventListener("click", joinRoom);
     resetBtn.addEventListener("click", resetGame);
     bestOfEl.addEventListener("change", updateMaxRounds);
@@ -259,17 +244,13 @@ function loadRoomsList() {
             }
 
             roomList.innerHTML = '';
-            // <<<<<<< YAHAN SE PASTE KAREIN
             paginatedRooms.forEach(room => {
                 const playerCount = room.players ? Object.keys(room.players).length : 0;
-                const isPrivate = room.password && room.password !== ''; // Check if room is private
-                const lockIcon = isPrivate ? '<span class="lock-icon">🔒</span>' : ''; // Add lock icon if private
-
                 const roomItem = document.createElement('div');
                 roomItem.className = 'room-item';
                 roomItem.innerHTML = `
                     <div class="room-info">
-                        <div>${room.roomName || 'Unnamed Room'} ${lockIcon}</div>
+                        <div>${room.roomName || 'Unnamed Room'}</div>
                         <div class="muted">Players: ${playerCount}/2 • Code: ${room.id}</div>
                     </div>
                     <div class="room-actions">
@@ -278,7 +259,6 @@ function loadRoomsList() {
                 `;
                 roomList.appendChild(roomItem);
             });
-// <<<<<<< YAHAN TAK PASTE KAREIN
 
             // Add event listeners to join buttons
             document.querySelectorAll('.join-room-btn').forEach(btn => {
@@ -563,12 +543,11 @@ function highlightWinningCells(cells) {
 function endRound(winner) {
     gameOver = true;
 
-    // Update scores, but only if there is a winner
+    // Update scores
     if (winner !== "draw") {
         scores[winner]++;
+        rounds++;
     }
-    // A round is completed, so we always increment the round counter
-    rounds++;
 
     updateScoreUI();
     log(`Round ended: ${winner}`);
@@ -752,180 +731,87 @@ function handleModeChange() {
 }
 
 // Create a multiplayer room
-//  function createRoom() {
- //   if (!onlineStatus) {
-  //      showAlert("You are offline — cannot create a room.");
-  //      return;
- //   }
-
- //   if (!database) {
-  //      showAlert("Firebase not configured. Please set up Firebase to use multiplayer features.");
-    //    return;
- //   }
-
-    // Don't reset the game when creating a room
-    // Only reset multiplayer-specific state
- //   roomId = "room_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
-//    mySymbol = "X";
- //   isRoomCreator = true;
-
-    // Generate a unique player ID
-//    playerId = "player_" + Math.random().toString(36).substr(2, 9);
-
-    // Add yourself as a player
-//    players = {
-     //   [playerId]: {
-       //     id: playerId,
-  //          symbol: "X",
-      //      isCreator: true,
-  //          name: "Player " + Math.floor(Math.random() * 1000)
- //       }
-//    };
-
-    // Create room in Firebase
-//    roomRef = database.ref('rooms/' + roomId);
- //   roomRef.set({
- //       board: board, // Use current board state
-   //     turn: currentPlayer, // Use current turn
- //       players: players,
-//        gameOver: gameOver, // Use current game over state
-  //      scores: scores, // Use current scores
- //       rounds: rounds, // Use current rounds
-  //      maxRounds: maxRounds,
- //       matchCompleted: matchCompleted,
-//        roomName: "Room by " + players[playerId].name,
-//        createdAt: Date.now(),
-//        lastUpdated: Date.now()
-//    }).then(() => {
-//        log(`Room created: ${roomId}`);
-//        log("Share the link with your friend");
-
-        // Set connection status to true
- //       isConnected = true;
-
-        // Set up real-time listener for this room
-//        roomRef.on('value', (snapshot) => {
-//            const roomData = snapshot.val();
-//            if (roomData) {
-  //              updateGameFromRoomData(roomData);
-  //           } else {
-                // Room was deleted
-  //              log("Room was deleted by the creator");
-  //              showAlert("Room was deleted by the creator");
-  //              leaveRoom();
- //           }
-  //      });
-
-        // Set up join requests listener
-//        setupJoinRequestsListener();
-
- //       linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-//        copyLink.disabled = false;
-
-   //     updateConnectionStatus(true, "Connected to room: " + roomId);
-  //      updatePlayerList();
-   //     updateStatusMessage();
-
-        // Load rooms list to update the UI
- //       loadRoomsList();
- //   }).catch((error) => {
-  //      log("Error creating room: " + error.message);
-  //      showAlert("Error creating room: " + error.message);
-  //  });
-// }
-
-
-
-
-async function handleCreateRoomSubmit() {
+function createRoom() {
     if (!onlineStatus) {
         showAlert("You are offline — cannot create a room.");
         return;
     }
-    
-    const roomName = roomNameInput.value.trim() || 'Anonymous Room';
-    const password = roomPasswordInput.value; // Can be empty for public rooms
-    
-    // Generate a unique 5-digit numeric ID
-    const newRoomId = await generateUniqueRoomId();
-    if (!newRoomId) {
-        showAlert("Could not create a unique room. Please try again.");
+
+    if (!database) {
+        showAlert("Firebase not configured. Please set up Firebase to use multiplayer features.");
         return;
     }
 
-    createRoom(newRoomId, roomName, password);
-    createRoomModal.style.display = 'none'; // Close modal after creation
-}
-
-// Helper function to generate a unique 5-digit room ID
-async function generateUniqueRoomId() {
-    let newId;
-    let attempts = 0;
-    while(attempts < 10) { // Try 10 times to find a unique ID
-        newId = Math.floor(10000 + Math.random() * 90000).toString();
-        const snapshot = await database.ref('rooms/' + newId).once('value');
-        if (!snapshot.exists()) {
-            return newId; // Found a unique ID
-        }
-        attempts++;
-    }
-    return null; // Failed to find a unique ID
-}
-
-
-
-
-
-function createRoom(newRoomId, roomName, password) {
-    roomId = newRoomId;
+    // Don't reset the game when creating a room
+    // Only reset multiplayer-specific state
+    roomId = "room_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
     mySymbol = "X";
     isRoomCreator = true;
+
+    // Generate a unique player ID
     playerId = "player_" + Math.random().toString(36).substr(2, 9);
 
+    // Add yourself as a player
     players = {
         [playerId]: {
             id: playerId,
             symbol: "X",
             isCreator: true,
+            name: "Player " + Math.floor(Math.random() * 1000)
         }
     };
 
+    // Create room in Firebase
     roomRef = database.ref('rooms/' + roomId);
     roomRef.set({
-        board: Array(9).fill(null),
-        turn: "X",
+        board: board, // Use current board state
+        turn: currentPlayer, // Use current turn
         players: players,
-        gameOver: false,
-        scores: { X: 0, O: 0 },
-        rounds: 0,
+        gameOver: gameOver, // Use current game over state
+        scores: scores, // Use current scores
+        rounds: rounds, // Use current rounds
         maxRounds: maxRounds,
-        matchCompleted: false,
-        roomName: roomName,
-        password: password, // Save password (even if empty)
+        matchCompleted: matchCompleted,
+        roomName: "Room by " + players[playerId].name,
         createdAt: Date.now(),
         lastUpdated: Date.now()
     }).then(() => {
         log(`Room created: ${roomId}`);
-        roomInput.value = roomId; // Show the new ID in the input box
+        log("Share the link with your friend");
 
+        // Set connection status to true
         isConnected = true;
-        setupRoomListeners(); // Centralized listener setup
+
+        // Set up real-time listener for this room
+        roomRef.on('value', (snapshot) => {
+            const roomData = snapshot.val();
+            if (roomData) {
+                updateGameFromRoomData(roomData);
+            } else {
+                // Room was deleted
+                log("Room was deleted by the creator");
+                showAlert("Room was deleted by the creator");
+                leaveRoom();
+            }
+        });
+
+        // Set up join requests listener
+        setupJoinRequestsListener();
 
         linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
         copyLink.disabled = false;
+
         updateConnectionStatus(true, "Connected to room: " + roomId);
         updatePlayerList();
         updateStatusMessage();
+
+        // Load rooms list to update the UI
         loadRoomsList();
-    }).catch(error => {
+    }).catch((error) => {
+        log("Error creating room: " + error.message);
         showAlert("Error creating room: " + error.message);
     });
 }
-
-
-
-
-
 
 // Set up join requests listener
 function setupJoinRequestsListener() {
@@ -953,454 +839,78 @@ function setupJoinRequestsListener() {
 }
 
 // Join a multiplayer room
-// function joinRoom() {
- //   if (!onlineStatus) {
-//        showAlert("You are offline — cannot join a room.");
-//        return;
-//    }
-
-//    if (!database) {
-  //      showAlert("Firebase not configured. Please set up Firebase to use multiplayer features.");
-//        return;
-//    }
-
-//    const roomCode = roomInput.value.trim();
-//    if (!roomCode) {
-   //     log("Please enter a room code");
- //       showAlert("Please enter a room code");
-  //      return;
-//    }
-
-    // Check if room is already full
-  //  database.ref('rooms/' + roomCode).once('value').then((snapshot) => {
-  //      const roomData = snapshot.val();
-//        if (!roomData) {
-    //        log("Room not found");
-    //        showAlert("Room not found. Please check the room code.");
-   //         return;
-  //      }
-
-    //    if (roomData.players && Object.keys(roomData.players).length >= 2) {
-     //       log("This room is already full");
- //           showAlert("This room is already full. Please create a new room or join a different one.");
-  //          return;
- //       }
-
-        // Don't reset the game when trying to join a room
-        // Only reset multiplayer-specific state
-     //   roomId = roomCode;
-
-        // Generate a unique player ID
- //       playerId = "player_" + Math.random().toString(36).substr(2, 9);
-   //     mySymbol = "O";
-  //      isRoomCreator = false;
-
-        // Send join request
-  //      const playerName = "Player " + Math.floor(Math.random() * 1000);
-  //      database.ref('joinRequests/' + roomId + '/' + playerId).set({
-//            playerName: playerName,
-    //        status: 'pending',
-//            timestamp: Date.now()
-  //      }).then(() => {
- //           log("Join request sent to room creator");
-   //         showAlert("Join request sent. Waiting for approval...");
-
-            // Listen for request response
-  //          database.ref('joinRequests/' + roomId + '/' + playerId).on('value', (snapshot) => {
-       //         const request = snapshot.val();
-   //             if (!request) return;
-
-   //             if (request.status === 'accepted') {
-                    // Join the room
-   //                 joinRoomAfterApproval(roomData, playerName);
-     //           } else if (request.status === 'rejected') {
-  //                  log("Your join request was rejected");
-   //                 showAlert("Your join request was rejected");
-  //                  database.ref('joinRequests/' + roomId + '/' + playerId).off();
- //               }
-     //       });
-    //    });
- //   }).catch((error) => {
-  //      log("Error joining room: " + error.message);
-     //   showAlert("Error joining room: " + error.message);
- //   });
-// }
-
-
-
-
-Buggy Draw and Round Counting
-57,775 tokens
-
-Model
-ThinkingThoughts
-(experimental)
-Auto
-Expand to view model thoughts
-
-chevron_right
-Model
-ThinkingThoughts
-(experimental)
-Auto
-Expand to view model thoughts
-
-chevron_right
-Model
-ThinkingThoughts
-(experimental)
-Auto
-Expand to view model thoughts
-
-chevron_right
-Model
-ThinkingThoughts
-(experimental)
-Auto
-Expand to view model thoughts
-
-chevron_right
-Zaroor! Yeh features aapke game ko bahut professional bana denge. Hum "Create Room" process ko ek popup (modal) mein badal denge jismein Room Name aur optional Password ke options honge, aur Room ID ko 5-digit number ka bana denge.
-Iske liye humein index.html, style.css, aur script.js teeno files mein changes karne honge. Chaliye, step-by-step karte hain.
-Step 1: index.html Mein Naye Modals Add Karein
-Humein do naye modals ki zaroorat padegi: ek room banane ke liye aur ek private room join karte waqt password daalne ke liye.
-Apne index.html file mein, </body> tag se theek pehle, neeche diya gaya HTML code add karein.
-code
-Html
-<!-- ... aapka baaki HTML code ... -->
-
-    <!-- Create Room Modal -->
-    <div class="modal" id="createRoomModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Create a New Room</h2>
-                <span class="close-btn" id="closeCreateModal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <input type="text" id="roomNameInput" placeholder="Enter Room Name" maxlength="25">
-                <input type="password" id="roomPasswordInput" placeholder="Set a Password (optional)">
-                <button id="createRoomSubmitBtn" class="primary">Create and Join</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Password Prompt Modal -->
-    <div class="modal" id="passwordModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Enter Password</h2>
-                <span class="close-btn" id="closePasswordModal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <p>This room is private. Please enter the password to join.</p>
-                <input type="password" id="passwordPromptInput" placeholder="Room Password">
-                <button id="passwordSubmitBtn" class="primary">Join Room</button>
-                <div id="passwordError" class="status-message status-error" style="display: none;"></div>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
-</html>
-Step 2: style.css Mein Modals Ki Styling Add Karein
-Ab inn modals ko aacha look dene ke liye, apni style.css file ke aakhir mein yeh CSS code add karein.
-code
-CSS
-/* --- Modal Styles --- */
-.modal {
-    display: none; 
-    position: fixed; 
-    z-index: 1001; 
-    left: 0;
-    top: 0;
-    width: 100%; 
-    height: 100%;
-    overflow: auto; 
-    background-color: rgba(0,0,0,0.6);
-}
-
-.modal-content {
-    background-color: var(--card-bg);
-    margin: 15% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 90%;
-    max-width: 400px;
-    border-radius: 12px;
-    animation: fadeIn 0.3s;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-}
-
-.modal-body input {
-    width: 100%;
-    margin-bottom: 15px;
-}
-
-.modal-body button {
-    width: 100%;
-}
-
-.close-btn {
-    color: #aaa;
-    font-size: 28px;
-    font-weight: bold;
-}
-
-.close-btn:hover,
-.close-btn:focus {
-    color: var(--fg);
-    text-decoration: none;
-    cursor: pointer;
-}
-
-@keyframes fadeIn {
-    from {opacity: 0; transform: scale(0.9);}
-    to {opacity: 1; transform: scale(1);}
-}
-
-.lock-icon {
-    margin-left: 8px;
-    opacity: 0.7;
-}
-Step 3: script.js Mein Logic Ko Update Karein
-Yeh sabse important step hai. Hum createRoom aur joinRoom functions ko poori tarah se badal denge.
-A. Naye DOM Elements ko define karein:
-Apne script.js mein, jahan aapne baaki DOM elements define kiye hain, wahan yeh lines add karein:
-code
-JavaScript
-// ... baaki DOM elements ...
-const createRoomModal = document.getElementById("createRoomModal");
-const passwordModal = document.getElementById("passwordModal");
-const roomNameInput = document.getElementById("roomNameInput");
-const roomPasswordInput = document.getElementById("roomPasswordInput");
-const createRoomSubmitBtn = document.getElementById("createRoomSubmitBtn");
-const passwordPromptInput = document.getElementById("passwordPromptInput");
-const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
-const closeCreateModal = document.getElementById("closeCreateModal");
-const closePasswordModal = document.getElementById("closePasswordModal");
-const passwordError = document.getElementById("passwordError");
-B. Event Listeners ko update karein:
-init() function ke andar, createBtn ke event listener ko badal dein aur naye listeners add karein.
-code
-JavaScript
-function init() {
-    // ... baaki event listeners ...
-    
-    // createBtn.addEventListener("click", createRoom); // <<-- YEH LINE DELETE KAREIN YA COMMENT KAREIN
-    
-    // NAYE LISTENERS ADD KAREIN
-    createBtn.addEventListener("click", () => createRoomModal.style.display = "block");
-    closeCreateModal.addEventListener("click", () => createRoomModal.style.display = "none");
-    createRoomSubmitBtn.addEventListener("click", handleCreateRoomSubmit);
-    closePasswordModal.addEventListener("click", () => passwordModal.style.display = "none");
-    
-    // ... baaki init() ka code ...
-}```
-
-**C. Puraane `createRoom` aur `joinRoom` ko Naye Functions se Replace karein:**
-Apne `script.js` file se **poora `createRoom` function aur poora `joinRoom` function delete kar dein** aur unki jagah neeche diye gaye naye functions paste karein.
-
-```javascript
-// --- NEW ROOM CREATION AND JOINING LOGIC ---
-
-// Step 1: User clicks "Create Room", this function is called from the modal
-async function handleCreateRoomSubmit() {
-    if (!onlineStatus) {
-        showAlert("You are offline — cannot create a room.");
-        return;
-    }
-    
-    const roomName = roomNameInput.value.trim() || 'Anonymous Room';
-    const password = roomPasswordInput.value; // Can be empty for public rooms
-    
-    // Generate a unique 5-digit numeric ID
-    const newRoomId = await generateUniqueRoomId();
-    if (!newRoomId) {
-        showAlert("Could not create a unique room. Please try again.");
-        return;
-    }
-
-    createRoom(newRoomId, roomName, password);
-    createRoomModal.style.display = 'none'; // Close modal after creation
-}
-
-// Helper function to generate a unique 5-digit room ID
-async function generateUniqueRoomId() {
-    let newId;
-    let attempts = 0;
-    while(attempts < 10) { // Try 10 times to find a unique ID
-        newId = Math.floor(10000 + Math.random() * 90000).toString();
-        const snapshot = await database.ref('rooms/' + newId).once('value');
-        if (!snapshot.exists()) {
-            return newId; // Found a unique ID
-        }
-        attempts++;
-    }
-    return null; // Failed to find a unique ID
-}
-
-// Step 2: Finalize room creation after getting details from modal
-function createRoom(newRoomId, roomName, password) {
-    roomId = newRoomId;
-    mySymbol = "X";
-    isRoomCreator = true;
-    playerId = "player_" + Math.random().toString(36).substr(2, 9);
-
-    players = {
-        [playerId]: {
-            id: playerId,
-            symbol: "X",
-            isCreator: true,
-        }
-    };
-
-    roomRef = database.ref('rooms/' + roomId);
-    roomRef.set({
-        board: Array(9).fill(null),
-        turn: "X",
-        players: players,
-        gameOver: false,
-        scores: { X: 0, O: 0 },
-        rounds: 0,
-        maxRounds: maxRounds,
-        matchCompleted: false,
-        roomName: roomName,
-        password: password, // Save password (even if empty)
-        createdAt: Date.now(),
-        lastUpdated: Date.now()
-    }).then(() => {
-        log(`Room created: ${roomId}`);
-        roomInput.value = roomId; // Show the new ID in the input box
-
-        isConnected = true;
-        setupRoomListeners(); // Centralized listener setup
-
-        linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-        copyLink.disabled = false;
-        updateConnectionStatus(true, "Connected to room: " + roomId);
-        updatePlayerList();
-        updateStatusMessage();
-        loadRoomsList();
-    }).catch(error => {
-        showAlert("Error creating room: " + error.message);
-    });
-}
-
-// Step 1 for Joining: User clicks "Join Room"
 function joinRoom() {
     if (!onlineStatus) {
         showAlert("You are offline — cannot join a room.");
         return;
     }
-    
-    const roomCode = roomInput.value.trim();
-    if (!roomCode) {
-        showAlert("Please enter a 5-digit room code.");
+
+    if (!database) {
+        showAlert("Firebase not configured. Please set up Firebase to use multiplayer features.");
         return;
     }
 
-    database.ref('rooms/' + roomCode).once('value').then(snapshot => {
+    const roomCode = roomInput.value.trim();
+    if (!roomCode) {
+        log("Please enter a room code");
+        showAlert("Please enter a room code");
+        return;
+    }
+
+    // Check if room is already full
+    database.ref('rooms/' + roomCode).once('value').then((snapshot) => {
         const roomData = snapshot.val();
         if (!roomData) {
+            log("Room not found");
             showAlert("Room not found. Please check the room code.");
             return;
         }
 
         if (roomData.players && Object.keys(roomData.players).length >= 2) {
-            showAlert("This room is already full.");
+            log("This room is already full");
+            showAlert("This room is already full. Please create a new room or join a different one.");
             return;
         }
 
-        // Check if the room has a password
-        if (roomData.password && roomData.password !== "") {
-            promptForPassword(roomCode, roomData);
-        } else {
-            // Public room, join directly
-            proceedToJoin(roomCode, roomData);
-        }
-    });
-}
+        // Don't reset the game when trying to join a room
+        // Only reset multiplayer-specific state
+        roomId = roomCode;
 
-// Step 2 for Joining (Private Rooms): Show password prompt
-function promptForPassword(roomCode, roomData) {
-    passwordModal.style.display = "block";
-    passwordError.style.display = "none";
-    passwordPromptInput.value = "";
-    
-    // We need a one-time listener for the submit button
-    const handlePasswordSubmit = () => {
-        const enteredPassword = passwordPromptInput.value;
-        if (enteredPassword === roomData.password) {
-            passwordModal.style.display = "none";
-            proceedToJoin(roomCode, roomData);
-            // Clean up the event listener to avoid duplicates
-            passwordSubmitBtn.removeEventListener('click', handlePasswordSubmit);
-        } else {
-            passwordError.textContent = "Incorrect password.";
-            passwordError.style.display = "block";
-        }
-    };
-    
-    passwordSubmitBtn.addEventListener('click', handlePasswordSubmit, { once: true });
-}
+        // Generate a unique player ID
+        playerId = "player_" + Math.random().toString(36).substr(2, 9);
+        mySymbol = "O";
+        isRoomCreator = false;
 
-// Step 3 for Joining: Finalize joining after checks/password
-function proceedToJoin(roomCode, roomData) {
-    roomId = roomCode;
-    mySymbol = "O";
-    isRoomCreator = false;
-    playerId = "player_" + Math.random().toString(36).substr(2, 9);
+        // Send join request
+        const playerName = "Player " + Math.floor(Math.random() * 1000);
+        database.ref('joinRequests/' + roomId + '/' + playerId).set({
+            playerName: playerName,
+            status: 'pending',
+            timestamp: Date.now()
+        }).then(() => {
+            log("Join request sent to room creator");
+            showAlert("Join request sent. Waiting for approval...");
 
-    // Add player to the room
-    const updatedPlayers = { ...roomData.players };
-    updatedPlayers[playerId] = {
-        id: playerId,
-        symbol: "O",
-        isCreator: false,
-    };
+            // Listen for request response
+            database.ref('joinRequests/' + roomId + '/' + playerId).on('value', (snapshot) => {
+                const request = snapshot.val();
+                if (!request) return;
 
-    roomRef = database.ref('rooms/' + roomId);
-    roomRef.update({
-        players: updatedPlayers,
-        lastUpdated: Date.now()
-    }).then(() => {
-        isConnected = true;
-        setupRoomListeners();
-
-        log(`Joined room: ${roomId}`);
-        linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-        copyLink.disabled = false;
-        updateConnectionStatus(true, "Connected to room: " + roomId);
-        updateStatusMessage();
-    }).catch(error => {
+                if (request.status === 'accepted') {
+                    // Join the room
+                    joinRoomAfterApproval(roomData, playerName);
+                } else if (request.status === 'rejected') {
+                    log("Your join request was rejected");
+                    showAlert("Your join request was rejected");
+                    database.ref('joinRequests/' + roomId + '/' + playerId).off();
+                }
+            });
+        });
+    }).catch((error) => {
+        log("Error joining room: " + error.message);
         showAlert("Error joining room: " + error.message);
     });
 }
-
-// Central function to set up room listeners
-function setupRoomListeners() {
-    roomRef.on('value', snapshot => {
-        const roomData = snapshot.val();
-        if (roomData) {
-            updateGameFromRoomData(roomData);
-        } else {
-            showAlert("Room was deleted by the creator.");
-            leaveRoom();
-        }
-    });
-
-
-
-
 
 // Join room after approval
 function joinRoomAfterApproval(roomData, playerName) {
@@ -1490,23 +1000,15 @@ function rejectJoinRequest() {
     }
 }
 
-// Update game state from room data - FINAL FIXED VERSION
+// Update game state from room data - FIXED VERSION
 function updateGameFromRoomData(roomData) {
     if (!roomData) return;
 
-    const oldBoardStateForLog = JSON.stringify(board);
+    // Store the previous state to detect changes
+    const currentBoardState = JSON.stringify(board);
 
-    // FIX: Normalize the board array to prevent sparse array issues from Firebase.
-    // This ensures that empty cells are always `null` and not `undefined` or empty slots.
-    const normalizedBoard = Array(9).fill(null);
-    if (roomData.board) {
-        for (let i = 0; i < 9; i++) {
-            normalizedBoard[i] = roomData.board[i] || null;
-        }
-    }
-    board = normalizedBoard;
-
-    // Update the rest of the game state from room data
+    // Update game state from room data
+    board = roomData.board || Array(9).fill(null);
     currentPlayer = roomData.turn || "X";
     gameOver = roomData.gameOver || false;
     players = roomData.players || {};
@@ -1523,24 +1025,29 @@ function updateGameFromRoomData(roomData) {
         bestOfEl.value = maxRounds.toString();
     }
 
-    // Always update the UI
+    // Check if board state changed
+    const newBoardState = JSON.stringify(board);
+    const boardChanged = currentBoardState !== newBoardState;
+
+    // Always update UI when we receive room data
     renderBoard();
     updateScoreUI();
     updatePlayerList();
     updateStatusMessage();
 
-    // Show match winner if the match is completed
+    // Show match winner if completed
     if (matchCompleted) {
         let matchWinnerText = "Draw";
         if (scores.X > scores.O) matchWinnerText = "X";
         if (scores.O > scores.X) matchWinnerText = "O";
+
         matchWinner.style.display = "block";
         matchWinner.textContent = `Match finished! Winner: ${matchWinnerText}`;
     } else {
         matchWinner.style.display = "none";
     }
 
-    // Highlight winning cells if the round is over
+    // Check if there's a win to highlight
     if (gameOver) {
         const result = checkWin();
         if (result && result.line) {
@@ -1548,9 +1055,7 @@ function updateGameFromRoomData(roomData) {
         }
     }
 
-    // Log if the board state was changed by the opponent
-    const newBoardState = JSON.stringify(board);
-    if (newBoardState !== oldBoardStateForLog) {
+    if (boardChanged) {
         log("Room state updated - opponent made a move");
     }
 }
