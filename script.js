@@ -523,9 +523,7 @@ function checkWin() {
     }
 
     // Check for draw
-    // This condition is now more robust. It checks if every cell is truthy ('X' or 'O').
-    // It will correctly evaluate to false if a cell is null or undefined.
-    if (board.every(cell => cell)) {
+    if (board.every(cell => cell !== null)) {
         return { winner: "draw", line: null };
     }
 
@@ -545,11 +543,11 @@ function highlightWinningCells(cells) {
 function endRound(winner) {
     gameOver = true;
 
-    // Update scores
+    // Update scores, but only if there is a winner
     if (winner !== "draw") {
         scores[winner]++;
     }
-    // A round is completed, so we always increment the counter.
+    // A round is completed, so we always increment the round counter
     rounds++;
 
     updateScoreUI();
@@ -1003,15 +1001,23 @@ function rejectJoinRequest() {
     }
 }
 
-// Update game state from room data - FIXED VERSION
+// Update game state from room data - FINAL FIXED VERSION
 function updateGameFromRoomData(roomData) {
     if (!roomData) return;
 
-    // Store the previous state to detect changes
-    const currentBoardState = JSON.stringify(board);
+    const oldBoardStateForLog = JSON.stringify(board);
 
-    // Update game state from room data
-    board = roomData.board || Array(9).fill(null);
+    // FIX: Normalize the board array to prevent sparse array issues from Firebase.
+    // This ensures that empty cells are always `null` and not `undefined` or empty slots.
+    const normalizedBoard = Array(9).fill(null);
+    if (roomData.board) {
+        for (let i = 0; i < 9; i++) {
+            normalizedBoard[i] = roomData.board[i] || null;
+        }
+    }
+    board = normalizedBoard;
+
+    // Update the rest of the game state from room data
     currentPlayer = roomData.turn || "X";
     gameOver = roomData.gameOver || false;
     players = roomData.players || {};
@@ -1028,29 +1034,24 @@ function updateGameFromRoomData(roomData) {
         bestOfEl.value = maxRounds.toString();
     }
 
-    // Check if board state changed
-    const newBoardState = JSON.stringify(board);
-    const boardChanged = currentBoardState !== newBoardState;
-
-    // Always update UI when we receive room data
+    // Always update the UI
     renderBoard();
     updateScoreUI();
     updatePlayerList();
     updateStatusMessage();
 
-    // Show match winner if completed
+    // Show match winner if the match is completed
     if (matchCompleted) {
         let matchWinnerText = "Draw";
         if (scores.X > scores.O) matchWinnerText = "X";
         if (scores.O > scores.X) matchWinnerText = "O";
-
         matchWinner.style.display = "block";
         matchWinner.textContent = `Match finished! Winner: ${matchWinnerText}`;
     } else {
         matchWinner.style.display = "none";
     }
 
-    // Check if there's a win to highlight
+    // Highlight winning cells if the round is over
     if (gameOver) {
         const result = checkWin();
         if (result && result.line) {
@@ -1058,7 +1059,9 @@ function updateGameFromRoomData(roomData) {
         }
     }
 
-    if (boardChanged) {
+    // Log if the board state was changed by the opponent
+    const newBoardState = JSON.stringify(board);
+    if (newBoardState !== oldBoardStateForLog) {
         log("Room state updated - opponent made a move");
     }
 }
