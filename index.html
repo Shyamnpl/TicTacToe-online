@@ -165,6 +165,39 @@
         </div>
     </div>
 
+<!-- ... aapka baaki HTML code ... -->
+
+    <!-- Create Room Modal -->
+    <div class="modal" id="createRoomModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create a New Room</h2>
+                <span class="close-btn" id="closeCreateModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="roomNameInput" placeholder="Enter Room Name" maxlength="25">
+                <input type="password" id="roomPasswordInput" placeholder="Set a Password (optional)">
+                <button id="createRoomSubmitBtn" class="primary">Create and Join</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Prompt Modal -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Enter Password</h2>
+                <span class="close-btn" id="closePasswordModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>This room is private. Please enter the password to join.</p>
+                <input type="password" id="passwordPromptInput" placeholder="Room Password">
+                <button id="passwordSubmitBtn" class="primary">Join Room</button>
+                <div id="passwordError" class="status-message status-error" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
