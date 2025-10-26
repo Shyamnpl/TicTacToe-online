@@ -523,7 +523,9 @@ function checkWin() {
     }
 
     // Check for draw
-    if (board.every(cell => cell !== null)) {
+    // This condition is now more robust. It checks if every cell is truthy ('X' or 'O').
+    // It will correctly evaluate to false if a cell is null or undefined.
+    if (board.every(cell => cell)) {
         return { winner: "draw", line: null };
     }
 
@@ -546,8 +548,9 @@ function endRound(winner) {
     // Update scores
     if (winner !== "draw") {
         scores[winner]++;
-        rounds++;
     }
+    // A round is completed, so we always increment the counter.
+    rounds++;
 
     updateScoreUI();
     log(`Round ended: ${winner}`);
