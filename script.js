@@ -68,6 +68,16 @@ const tabContents = document.querySelectorAll('.tab-content');
 const notificationBadge = document.getElementById("notificationBadge");
 const browseTabButton = document.getElementById("browseTabButton");
 const matchWinner = document.getElementById("matchWinner");
+const createRoomModal = document.getElementById("createRoomModal");
+const passwordModal = document.getElementById("passwordModal");
+const roomNameInput = document.getElementById("roomNameInput");
+const roomPasswordInput = document.getElementById("roomPasswordInput");
+const createRoomSubmitBtn = document.getElementById("createRoomSubmitBtn");
+const passwordPromptInput = document.getElementById("passwordPromptInput");
+const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
+const closeCreateModal = document.getElementById("closeCreateModal");
+const closePasswordModal = document.getElementById("closePasswordModal");
+const passwordError = document.getElementById("passwordError");
 
 // Game state
 let board = Array(9).fill(null);
@@ -92,6 +102,7 @@ let onlineStatus = navigator.onLine;
 let pendingRequests = 0;
 let matchCompleted = false;
 let lastBoardState = JSON.stringify(board);
+let isSpectator = false;
 
 // Firebase references
 let roomRef = null;
@@ -107,7 +118,7 @@ function init() {
 
     // Event listeners
     modeEl.addEventListener("change", handleModeChange);
-    createBtn.addEventListener("click", createRoom);
+    createBtn.addEventListener("click", showCreateRoomModal);
     joinBtn.addEventListener("click", joinRoom);
     resetBtn.addEventListener("click", resetGame);
     bestOfEl.addEventListener("change", updateMaxRounds);
@@ -121,6 +132,9 @@ function init() {
     nextPageBtn.addEventListener("click", () => changePage(1));
     acceptRequestBtn.addEventListener("click", acceptJoinRequest);
     rejectRequestBtn.addEventListener("click", rejectJoinRequest);
+    closeCreateModal.addEventListener("click", () => createRoomModal.style.display = "none");
+    createRoomSubmitBtn.addEventListener("click", handleCreateRoomSubmit);
+    closePasswordModal.addEventListener("click", () => passwordModal.style.display = "none");
 
     // Tab switching
     tabs.forEach(tab => {
@@ -158,6 +172,8 @@ function init() {
 
 // Switch between tabs
 function switchTab(tabId) {
+    console.log("Switching to tab:", tabId);
+    
     tabs.forEach(tab => {
         if (tab.getAttribute('data-tab') === tabId) {
             tab.classList.add('active');
@@ -248,9 +264,13 @@ function loadRoomsList() {
                 const playerCount = room.players ? Object.keys(room.players).length : 0;
                 const roomItem = document.createElement('div');
                 roomItem.className = 'room-item';
+                
+                // Lock icon add karein agar password hai
+                const lockIcon = room.password ? '🔒' : '';
+                
                 roomItem.innerHTML = `
                     <div class="room-info">
-                        <div>${room.roomName || 'Unnamed Room'}</div>
+                        <div>${room.roomName || 'Unnamed Room'} ${lockIcon}</div>
                         <div class="muted">Players: ${playerCount}/2 • Code: ${room.id}</div>
                     </div>
                     <div class="room-actions">
@@ -263,8 +283,9 @@ function loadRoomsList() {
             // Add event listeners to join buttons
             document.querySelectorAll('.join-room-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const roomId = e.target.getAttribute('data-room');
-                    roomInput.value = roomId;
+                    const roomIdToJoin = e.target.getAttribute('data-room');
+                    roomInput.value = roomIdToJoin;
+                    joinRoom();
                     switchTab('create');
                 });
             });
@@ -362,8 +383,8 @@ function renderBoard() {
         if (board[i] === "X") cell.classList.add("x");
         if (board[i] === "O") cell.classList.add("o");
 
-        // Disable cell if it's not player's turn in multiplayer
-        if (isMultiplayer && isConnected && (currentPlayer !== mySymbol || gameOver || matchCompleted)) {
+        // Disable cell if it's not player's turn in multiplayer OR if spectating
+        if (isSpectator || (isMultiplayer && isConnected && (currentPlayer !== mySymbol || gameOver || matchCompleted))) {
             cell.classList.add("disabled");
         }
 
@@ -387,6 +408,12 @@ function updateScoreUI() {
 
 // Update status message
 function updateStatusMessage() {
+    if (isSpectator) {
+        statusMessage.textContent = "You are spectating";
+        statusMessage.className = "status-message status-waiting";
+        return;
+    }
+
     if (!isMultiplayer) {
         statusMessage.textContent = "";
         statusMessage.className = "status-message";
@@ -413,6 +440,7 @@ function updateStatusMessage() {
 
 // Handle cell click
 function handleCellClick(index) {
+    if (isSpectator) return;
     if (gameOver || matchCompleted) {
         log("Game over - reset to play again");
         return;
@@ -731,81 +759,122 @@ function handleModeChange() {
 }
 
 // Create a multiplayer room
-function createRoom() {
+async function showCreateRoomModal() {
     if (!onlineStatus) {
         showAlert("You are offline — cannot create a room.");
         return;
     }
-
     if (!database) {
-        showAlert("Firebase not configured. Please set up Firebase to use multiplayer features.");
+        showAlert("Firebase not configured.");
         return;
     }
 
-    // Don't reset the game when creating a room
-    // Only reset multiplayer-specific state
-    roomId = "room_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    // Show the modal
+    createRoomModal.style.display = "block";
+
+    // Handle the submission when the user clicks "Create and Join" inside the modal
+    createRoomSubmitBtn.onclick = async () => {
+        const roomName = roomNameInput.value.trim() || 'Anonymous Room';
+        const password = roomPasswordInput.value;
+
+        // Generate a unique 5-digit numeric ID
+        const newRoomId = await generateUniqueRoomId();
+        if (!newRoomId) {
+            showAlert("Could not create a unique room. Please try again.");
+            return;
+        }
+
+        // Ab hum original createRoom logic ko call karenge
+        createRoom(newRoomId, roomName, password);
+
+        // Modal band karein
+        createRoomModal.style.display = 'none';
+    };
+}
+
+// Handle create room form submission
+function handleCreateRoomSubmit() {
+    const roomName = roomNameInput.value.trim() || 'Anonymous Room';
+    const password = roomPasswordInput.value;
+
+    generateUniqueRoomId().then(newRoomId => {
+        if (!newRoomId) {
+            showAlert("Could not create a unique room. Please try again.");
+            return;
+        }
+        createRoom(newRoomId, roomName, password);
+        createRoomModal.style.display = 'none';
+    });
+}
+
+// Generate unique room ID
+async function generateUniqueRoomId() {
+    let newId;
+    let attempts = 0;
+    while(attempts < 10) {
+        newId = Math.floor(10000 + Math.random() * 90000).toString();
+        const snapshot = await database.ref('rooms/' + newId).once('value');
+        if (!snapshot.exists()) {
+            return newId;
+        }
+        attempts++;
+    }
+    return null;
+}
+
+// Create room function
+function createRoom(newRoomId, roomName, password) {
+    roomId = newRoomId;
     mySymbol = "X";
     isRoomCreator = true;
-
-    // Generate a unique player ID
     playerId = "player_" + Math.random().toString(36).substr(2, 9);
-
-    // Add yourself as a player
     players = {
         [playerId]: {
             id: playerId,
             symbol: "X",
             isCreator: true,
-            name: "Player " + Math.floor(Math.random() * 1000)
+            name: "Player X"
         }
     };
 
-    // Create room in Firebase
     roomRef = database.ref('rooms/' + roomId);
     roomRef.set({
-        board: board, // Use current board state
-        turn: currentPlayer, // Use current turn
+        board: board,
+        turn: currentPlayer,
         players: players,
-        gameOver: gameOver, // Use current game over state
-        scores: scores, // Use current scores
-        rounds: rounds, // Use current rounds
+        gameOver: gameOver,
+        scores: scores,
+        rounds: rounds,
         maxRounds: maxRounds,
         matchCompleted: matchCompleted,
-        roomName: "Room by " + players[playerId].name,
+        roomName: roomName,
+        password: password,
         createdAt: Date.now(),
         lastUpdated: Date.now()
     }).then(() => {
         log(`Room created: ${roomId}`);
         log("Share the link with your friend");
-
-        // Set connection status to true
         isConnected = true;
-
-        // Set up real-time listener for this room
+        
         roomRef.on('value', (snapshot) => {
             const roomData = snapshot.val();
             if (roomData) {
                 updateGameFromRoomData(roomData);
             } else {
-                // Room was deleted
                 log("Room was deleted by the creator");
                 showAlert("Room was deleted by the creator");
                 leaveRoom();
             }
         });
 
-        // Set up join requests listener
+        // Setup join requests listener
         setupJoinRequestsListener();
 
         linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
         copyLink.disabled = false;
-
         updateConnectionStatus(true, "Connected to room: " + roomId);
         updatePlayerList();
         updateStatusMessage();
-
-        // Load rooms list to update the UI
         loadRoomsList();
     }).catch((error) => {
         log("Error creating room: " + error.message);
@@ -838,126 +907,126 @@ function setupJoinRequestsListener() {
     });
 }
 
-// Join a multiplayer room
-function joinRoom() {
-    if (!onlineStatus) {
-        showAlert("You are offline — cannot join a room.");
-        return;
-    }
+// Custom Confirmation Box
+function showConfirmation(message, confirmText, onConfirm) {
+    alertMessage.innerHTML = message;
+    alertButtonOk.textContent = confirmText;
+    alertButtonCancel.style.display = "inline-block";
+    customAlert.style.display = "block";
+    overlay.style.display = "block";
 
-    if (!database) {
-        showAlert("Firebase not configured. Please set up Firebase to use multiplayer features.");
-        return;
-    }
-
-    const roomCode = roomInput.value.trim();
-    if (!roomCode) {
-        log("Please enter a room code");
-        showAlert("Please enter a room code");
-        return;
-    }
-
-    // Check if room is already full
-    database.ref('rooms/' + roomCode).once('value').then((snapshot) => {
-        const roomData = snapshot.val();
-        if (!roomData) {
-            log("Room not found");
-            showAlert("Room not found. Please check the room code.");
-            return;
-        }
-
-        if (roomData.players && Object.keys(roomData.players).length >= 2) {
-            log("This room is already full");
-            showAlert("This room is already full. Please create a new room or join a different one.");
-            return;
-        }
-
-        // Don't reset the game when trying to join a room
-        // Only reset multiplayer-specific state
-        roomId = roomCode;
-
-        // Generate a unique player ID
-        playerId = "player_" + Math.random().toString(36).substr(2, 9);
-        mySymbol = "O";
-        isRoomCreator = false;
-
-        // Send join request
-        const playerName = "Player " + Math.floor(Math.random() * 1000);
-        database.ref('joinRequests/' + roomId + '/' + playerId).set({
-            playerName: playerName,
-            status: 'pending',
-            timestamp: Date.now()
-        }).then(() => {
-            log("Join request sent to room creator");
-            showAlert("Join request sent. Waiting for approval...");
-
-            // Listen for request response
-            database.ref('joinRequests/' + roomId + '/' + playerId).on('value', (snapshot) => {
-                const request = snapshot.val();
-                if (!request) return;
-
-                if (request.status === 'accepted') {
-                    // Join the room
-                    joinRoomAfterApproval(roomData, playerName);
-                } else if (request.status === 'rejected') {
-                    log("Your join request was rejected");
-                    showAlert("Your join request was rejected");
-                    database.ref('joinRequests/' + roomId + '/' + playerId).off();
-                }
-            });
-        });
-    }).catch((error) => {
-        log("Error joining room: " + error.message);
-        showAlert("Error joining room: " + error.message);
-    });
-}
-
-// Join room after approval
-function joinRoomAfterApproval(roomData, playerName) {
-    // Add yourself as a player
-    const updatedPlayers = {...roomData.players};
-    updatedPlayers[playerId] = {
-        id: playerId,
-        symbol: "O",
-        isCreator: false,
-        name: playerName
+    const confirmHandler = () => {
+        hideAlert(); onConfirm(); cleanup();
+    };
+    const cancelHandler = () => {
+        hideAlert(); cleanup();
+    };
+    const cleanup = () => {
+        alertButtonOk.removeEventListener('click', confirmHandler);
+        alertButtonCancel.removeEventListener('click', cancelHandler);
+        alertButtonOk.textContent = "OK";
+        alertButtonCancel.style.display = "none";
     };
 
-    // Update room with new player
+    alertButtonOk.addEventListener('click', confirmHandler);
+    alertButtonCancel.addEventListener('click', cancelHandler);
+}
+
+// Updated joinRoom function
+function joinRoom() {
+    if (!onlineStatus) { showAlert("You are offline."); return; }
+    const roomCode = roomInput.value.trim();
+    if (!roomCode) { showAlert("Please enter a room code."); return; }
+
+    database.ref('rooms/' + roomCode).once('value').then((snapshot) => {
+        const roomData = snapshot.val();
+        if (!roomData) { showAlert("Room not found."); return; }
+
+        if (roomData.players && Object.keys(roomData.players).length >= 2) {
+            showConfirmation(
+                "This room is full.<br>Would you like to spectate?",
+                "Spectate",
+                () => { spectateRoom(roomCode); }
+            );
+            return;
+        }
+
+        if (roomData.password) {
+            promptForPassword(roomCode, roomData);
+        } else {
+            proceedToJoin(roomCode, roomData);
+        }
+    }).catch(error => { showAlert("Error: " + error.message); });
+}
+
+// Prompt for password
+function promptForPassword(roomCode, roomData) {
+    passwordModal.style.display = "block";
+    passwordError.style.display = "none";
+    
+    passwordSubmitBtn.onclick = () => {
+        const enteredPassword = passwordPromptInput.value;
+        if (enteredPassword === roomData.password) {
+            passwordModal.style.display = "none";
+            proceedToJoin(roomCode, roomData);
+        } else {
+            passwordError.style.display = "block";
+            passwordError.textContent = "Incorrect password!";
+        }
+    };
+}
+
+// New Spectate Function
+function spectateRoom(roomCode) {
+    leaveRoom();
+    roomId = roomCode;
+    isSpectator = true;
+    mySymbol = 'Spectator';
+    
     roomRef = database.ref('rooms/' + roomId);
-    roomRef.update({
-        players: updatedPlayers,
-        lastUpdated: Date.now()
-    }).then(() => {
-        // Set connection status to true
-        isConnected = true;
-
-        // Set up real-time listener for this room
-        roomRef.on('value', (snapshot) => {
-            const roomData = snapshot.val();
-            if (roomData) {
-                updateGameFromRoomData(roomData);
-            } else {
-                // Room was deleted
-                log("Room was deleted by the creator");
-                showAlert("Room was deleted by the creator");
-                leaveRoom();
-            }
-        });
-
-        log(`Joined room: ${roomId}`);
-        linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-        copyLink.disabled = false;
-
-        updateConnectionStatus(true, "Connected to room: " + roomId);
-        updateStatusMessage();
-
-        // Clean up join request
-        database.ref('joinRequests/' + roomId + '/' + playerId).off();
-        database.ref('joinRequests/' + roomId + '/' + playerId).remove();
-    }).catch((error) => {
-        log("Error joining room: " + error.message);
+    roomRef.on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            updateGameFromRoomData(snapshot.val());
+        } else {
+            showAlert("The room was deleted.");
+            leaveRoom();
+        }
     });
+
+    isConnected = true;
+    updateConnectionStatus(true, "Spectating room: " + roomCode);
+    log(`Started spectating room: ${roomCode}`);
+}
+
+// Proceed to join room
+function proceedToJoin(roomCode, roomData) {
+    roomId = roomCode;
+    playerId = "player_" + Math.random().toString(36).substr(2, 9);
+    mySymbol = "O";
+    isRoomCreator = false;
+
+    // Player ko room mein add karein
+    const updatedPlayers = { ...roomData.players };
+    updatedPlayers[playerId] = { id: playerId, symbol: "O", isCreator: false, name: "Player O" };
+
+    roomRef = database.ref('rooms/' + roomId);
+    roomRef.update({ players: updatedPlayers, lastUpdated: Date.now() })
+        .then(() => {
+            isConnected = true;
+            roomRef.on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    updateGameFromRoomData(snapshot.val());
+                } else {
+                    showAlert("Room was deleted.");
+                    leaveRoom();
+                }
+            });
+            log(`Joined room: ${roomId}`);
+            linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+            copyLink.disabled = false;
+            updateConnectionStatus(true, "Connected to room: " + roomId);
+            updateStatusMessage();
+        });
 }
 
 // Accept join request
@@ -1000,7 +1069,7 @@ function rejectJoinRequest() {
     }
 }
 
-// Update game state from room data - FIXED VERSION
+// Update game state from room data
 function updateGameFromRoomData(roomData) {
     if (!roomData) return;
 
@@ -1089,6 +1158,7 @@ function leaveRoom() {
     isRoomFull = false;
     playerId = null;
     isRoomCreator = false;
+    isSpectator = false;
     joinRequestPlayerId = null;
     pendingRequests = 0;
     updateNotificationBadge();
@@ -1120,7 +1190,7 @@ function updateMaxRounds() {
     if (isMultiplayer && isConnected && !isRoomCreator) {
         log("Only the room creator can change the number of rounds");
         showAlert("Only the room creator can change the number of rounds");
-        bestOfEl.value = maxRounds.toString(); // Revert the change
+        bestOfEl.value = maxRounds.toString();
         return;
     }
 

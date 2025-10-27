@@ -10,7 +10,7 @@
 </head>
 <body>
     <header>
-        <h1>🎮 TicTacToe Deluxe — Multiplayer (Fixed Real-time)</h1>
+        <h1>🎮 TicTacToe Deluxe <a id="adminLink" href="/admin/admin.html" target="_blank" title="Admin Panel">⚙️</a></h1>
         <div class="controls">
             <select id="mode">
                 <option value="friend">Local Friend</option>
@@ -162,6 +162,38 @@
         <div>
             <button class="custom-alert-btn primary" id="acceptRequestBtn">Accept</button>
             <button class="custom-alert-btn danger" id="rejectRequestBtn">Reject</button>
+        </div>
+    </div>
+
+
+    <!-- Create Room Modal -->
+    <div class="modal" id="createRoomModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create a New Room</h2>
+                <span class="close-btn" id="closeCreateModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="roomNameInput" placeholder="Enter Room Name" maxlength="25">
+                <input type="password" id="roomPasswordInput" placeholder="Set a Password (optional)">
+                <button id="createRoomSubmitBtn" class="primary">Create and Join</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Prompt Modal -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Enter Password</h2>
+                <span class="close-btn" id="closePasswordModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>This room is private. Please enter the password to join.</p>
+                <input type="password" id="passwordPromptInput" placeholder="Room Password">
+                <button id="passwordSubmitBtn" class="primary">Join Room</button>
+                <div id="passwordError" class="status-message status-error" style="display: none;"></div>
+            </div>
         </div>
     </div>
 
