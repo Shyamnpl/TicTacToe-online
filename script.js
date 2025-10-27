@@ -68,7 +68,6 @@ const tabContents = document.querySelectorAll('.tab-content');
 const notificationBadge = document.getElementById("notificationBadge");
 const browseTabButton = document.getElementById("browseTabButton");
 const matchWinner = document.getElementById("matchWinner");
-// ... matchWinner ke baad yeh add karein
 const createRoomModal = document.getElementById("createRoomModal");
 const passwordModal = document.getElementById("passwordModal");
 const roomNameInput = document.getElementById("roomNameInput");
@@ -79,7 +78,6 @@ const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
 const closeCreateModal = document.getElementById("closeCreateModal");
 const closePasswordModal = document.getElementById("closePasswordModal");
 const passwordError = document.getElementById("passwordError");
-
 
 // Game state
 let board = Array(9).fill(null);
@@ -132,14 +130,11 @@ function init() {
     deleteRoomBtn.addEventListener("click", deleteRoom);
     prevPageBtn.addEventListener("click", () => changePage(-1));
     nextPageBtn.addEventListener("click", () => changePage(1));
-   acceptRequestBtn.addEventListener("click", acceptJoinRequest);
+    acceptRequestBtn.addEventListener("click", acceptJoinRequest);
     rejectRequestBtn.addEventListener("click", rejectJoinRequest);
-closeCreateModal.addEventListener("click", () => createRoomModal.style.display = "none");
+    closeCreateModal.addEventListener("click", () => createRoomModal.style.display = "none");
     createRoomSubmitBtn.addEventListener("click", handleCreateRoomSubmit);
     closePasswordModal.addEventListener("click", () => passwordModal.style.display = "none");
-
-
-
 
     // Tab switching
     tabs.forEach(tab => {
@@ -212,7 +207,6 @@ function updateNotificationBadge() {
 }
 
 // Load rooms list from Firebase
-// Load rooms list from Firebase
 function loadRoomsList() {
     if (!onlineStatus) {
         roomList.innerHTML = "<div class='status-message status-error'>You are offline - cannot load rooms</div>";
@@ -269,12 +263,12 @@ function loadRoomsList() {
                 const roomItem = document.createElement('div');
                 roomItem.className = 'room-item';
                 
-                // YEH NAYA CODE - Lock icon add karein agar password hai
-                const lockIcon = room.password ? '🔒' : '';
+                // Lock icon add karein agar password hai
+                const lockIcon = room.password ? ' 🔒' : '';
                 
                 roomItem.innerHTML = `
                     <div class="room-info">
-                        <div>${room.roomName || 'Unnamed Room'} ${lockIcon}</div>
+                        <div>${room.roomName || 'Unnamed Room'}${lockIcon}</div>
                         <div class="muted">Players: ${playerCount}/2 • Code: ${room.id}</div>
                     </div>
                     <div class="room-actions">
@@ -387,10 +381,10 @@ function renderBoard() {
         if (board[i] === "X") cell.classList.add("x");
         if (board[i] === "O") cell.classList.add("o");
 
-    // Disable cell if it's not player's turn in multiplayer OR if spectating
-if (isSpectator || (isMultiplayer && isConnected && (currentPlayer !== mySymbol || gameOver || matchCompleted))) {
-    cell.classList.add("disabled");
-}
+        // Disable cell if it's not player's turn in multiplayer OR if spectating
+        if (isSpectator || (isMultiplayer && isConnected && (currentPlayer !== mySymbol || gameOver || matchCompleted))) {
+            cell.classList.add("disabled");
+        }
 
         cell.textContent = board[i] || "";
         cell.addEventListener("click", () => handleCellClick(i));
@@ -412,13 +406,12 @@ function updateScoreUI() {
 
 // Update status message
 function updateStatusMessage() {
-// <-- YAHAN SE NAYA CODE ADD KAREIN
     if (isSpectator) {
         statusMessage.textContent = "You are spectating";
         statusMessage.className = "status-message status-waiting";
         return;
     }
-    // <-- YAHAN TAK
+
     if (!isMultiplayer) {
         statusMessage.textContent = "";
         statusMessage.className = "status-message";
@@ -445,7 +438,7 @@ function updateStatusMessage() {
 
 // Handle cell click
 function handleCellClick(index) {
-if (isSpectator) return; // <-- YEH NAYI LINE ADD KAREIN
+    if (isSpectator) return;
     if (gameOver || matchCompleted) {
         log("Game over - reset to play again");
         return;
@@ -764,7 +757,6 @@ function handleModeChange() {
 }
 
 // Create a multiplayer room
-// This function shows the modal and handles its submission
 async function showCreateRoomModal() {
     if (!onlineStatus) {
         showAlert("You are offline — cannot create a room.");
@@ -783,14 +775,12 @@ async function showCreateRoomModal() {
         const roomName = roomNameInput.value.trim() || 'Anonymous Room';
         const password = roomPasswordInput.value;
 
-        // --- Naya Code Shuru ---
         // Generate a unique 5-digit numeric ID
         const newRoomId = await generateUniqueRoomId();
         if (!newRoomId) {
             showAlert("Could not create a unique room. Please try again.");
             return;
         }
-        // --- Naya Code Khatam ---
 
         // Ab hum original createRoom logic ko call karenge
         createRoom(newRoomId, roomName, password);
@@ -800,7 +790,22 @@ async function showCreateRoomModal() {
     };
 }
 
-// This is a helper function, isko neeche diye gaye function ke neeche add karein
+// Handle create room form submission
+function handleCreateRoomSubmit() {
+    const roomName = roomNameInput.value.trim() || 'Anonymous Room';
+    const password = roomPasswordInput.value;
+
+    generateUniqueRoomId().then(newRoomId => {
+        if (!newRoomId) {
+            showAlert("Could not create a unique room. Please try again.");
+            return;
+        }
+        createRoom(newRoomId, roomName, password);
+        createRoomModal.style.display = 'none';
+    });
+}
+
+// Generate unique room ID
 async function generateUniqueRoomId() {
     let newId;
     let attempts = 0;
@@ -808,17 +813,15 @@ async function generateUniqueRoomId() {
         newId = Math.floor(10000 + Math.random() * 90000).toString();
         const snapshot = await database.ref('rooms/' + newId).once('value');
         if (!snapshot.exists()) {
-            return newId; // Unique ID mil gaya
+            return newId;
         }
         attempts++;
     }
-    return null; // Unique ID nahi mila
+    return null;
 }
 
-
-// This is your original function, modified for the new features
+// Create room function
 function createRoom(newRoomId, roomName, password) {
-    // ID ab modal se generate hokar aayega
     roomId = newRoomId;
     mySymbol = "X";
     isRoomCreator = true;
@@ -828,7 +831,7 @@ function createRoom(newRoomId, roomName, password) {
             id: playerId,
             symbol: "X",
             isCreator: true,
-            name: "Player X" // Naam ko simple rakha hai
+            name: "Player X"
         }
     };
 
@@ -842,10 +845,8 @@ function createRoom(newRoomId, roomName, password) {
         rounds: rounds,
         maxRounds: maxRounds,
         matchCompleted: matchCompleted,
-        // --- Naya Code Shuru ---
-        roomName: roomName, // Room name modal se aayega
-        password: password, // Password modal se aayega
-        // --- Naya Code Khatam ---
+        roomName: roomName,
+        password: password,
         createdAt: Date.now(),
         lastUpdated: Date.now()
     }).then(() => {
@@ -864,9 +865,6 @@ function createRoom(newRoomId, roomName, password) {
             }
         });
 
-        // Join Request listener ki zaroorat nahi
-        // setupJoinRequestsListener(); 
-
         linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
         copyLink.disabled = false;
         updateConnectionStatus(true, "Connected to room: " + roomId);
@@ -878,34 +876,6 @@ function createRoom(newRoomId, roomName, password) {
         showAlert("Error creating room: " + error.message);
     });
 }
-
-// Set up join requests listener
-//function setupJoinRequestsListener() {
- //   if (!roomId) return;
-
-//    joinRequestsRef = database.ref('joinRequests/' + roomId);
-//    joinRequestsRef.on('child_added', (snapshot) => {
-//        const request = snapshot.val();
-//       if (request && request.status === 'pending') {
- //           pendingRequests++;
-   //         updateNotificationBadge();
-//
-            // Show notification if not already viewing requests
-  //          if (!document.getElementById('browseTab').classList.contains('active')) {
-  //              showJoinRequestAlert(request.playerName, snapshot.key);
-    //        }
- //       }
-//    });
-
-    // Also listen for removed requests
-//    joinRequestsRef.on('child_removed', (snapshot) => {
-   //     pendingRequests = Math.max(0, pendingRequests - 1);
-//        updateNotificationBadge();
- //   });
-//}
-
-// Join a multiplayer room
-// --- NAYA JOIN AUR SPECTATE LOGIC (ISE PASTE KAREIN) ---
 
 // Custom Confirmation Box
 function showConfirmation(message, confirmText, onConfirm) {
@@ -959,9 +929,27 @@ function joinRoom() {
     }).catch(error => { showAlert("Error: " + error.message); });
 }
 
+// Prompt for password
+function promptForPassword(roomCode, roomData) {
+    passwordModal.style.display = "block";
+    passwordError.style.display = "none";
+    passwordPromptInput.value = "";
+    
+    passwordSubmitBtn.onclick = () => {
+        const enteredPassword = passwordPromptInput.value;
+        if (enteredPassword === roomData.password) {
+            passwordModal.style.display = "none";
+            proceedToJoin(roomCode, roomData);
+        } else {
+            passwordError.style.display = "block";
+            passwordError.textContent = "Incorrect password!";
+        }
+    };
+}
+
 // New Spectate Function
 function spectateRoom(roomCode) {
-    leaveRoom(); // Pehle kisi purane room mein ho to use chhod do
+    leaveRoom();
     roomId = roomCode;
     isSpectator = true;
     mySymbol = 'Spectator';
@@ -981,7 +969,7 @@ function spectateRoom(roomCode) {
     log(`Started spectating room: ${roomCode}`);
 }
 
-// Yeh ek naya helper function hai, isko joinRoom ke neeche add karein
+// Proceed to join room
 function proceedToJoin(roomCode, roomData) {
     roomId = roomCode;
     playerId = "player_" + Math.random().toString(36).substr(2, 9);
@@ -1012,95 +1000,47 @@ function proceedToJoin(roomCode, roomData) {
         });
 }
 
-// Join room after approval
-// function joinRoomAfterApproval(roomData, playerName) {
-    // Add yourself as a player
-//    const updatedPlayers = {...roomData.players};
-//    updatedPlayers[playerId] = {
-//        id: playerId,
-//        symbol: "O",
-//        isCreator: false,
-//        name: playerName
-//    };
-
-    // Update room with new player
-//    roomRef = database.ref('rooms/' + roomId);
-//    roomRef.update({
-//        players: updatedPlayers,
-///        lastUpdated: Date.now()
-//    }).then(() => {
-        // Set connection status to true
-  //       isConnected = true;
-
-        // Set up real-time listener for this room
-//        roomRef.on('value', (snapshot) => {
-  //          const roomData = snapshot.val();
-   //         if (roomData) {
-   //             updateGameFromRoomData(roomData);
- //           } else {
-    //            // Room was deleted
-     //           log("Room was deleted by the creator");
-    //            showAlert("Room was deleted by the creator");
-     //           leaveRoom();
-     //       }
-  //      });
-
-  //      log(`Joined room: ${roomId}`);
-  //      linkBox.textContent = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-    //    copyLink.disabled = false;
-
-  //      updateConnectionStatus(true, "Connected to room: " + roomId);
-  //      updateStatusMessage();
-
-        // Clean up join request
- //       database.ref('joinRequests/' + roomId + '/' + playerId).off();
-  //      database.ref('joinRequests/' + roomId + '/' + playerId).remove();
-//    }).catch((error) => {
-  //      log("Error joining room: " + error.message);
-  //  });
-//}
-
 // Accept join request
-//function acceptJoinRequest() {
- //   if (joinRequestPlayerId) {
-  //      database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).update({
-  //          status: 'accepted'
-  //      }).then(() => {
-  //         log("Join request accepted");
-     //       hideAlert();
+function acceptJoinRequest() {
+    if (joinRequestPlayerId) {
+        database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).update({
+            status: 'accepted'
+        }).then(() => {
+            log("Join request accepted");
+            hideAlert();
 
             // Remove the request
-      //      database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).remove();
+            database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).remove();
 
-    //        pendingRequests--;
-  //          updateNotificationBadge();
- //           joinRequestPlayerId = null;
-    //    });
-  //  }
-//}
+            pendingRequests--;
+            updateNotificationBadge();
+            joinRequestPlayerId = null;
+        });
+    }
+}
 
 // Reject join request
-//function rejectJoinRequest() {
-//    if (joinRequestPlayerId) {
-   //     database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).update({
- //           status: 'rejected'
-//        }).then(() => {
-    //        log("Join request rejected");
-   //         hideAlert();
-//
+function rejectJoinRequest() {
+    if (joinRequestPlayerId) {
+        database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).update({
+            status: 'rejected'
+        }).then(() => {
+            log("Join request rejected");
+            hideAlert();
+
             // Remove the request after a delay to allow the user to see the rejection
-   //         setTimeout(() => {
-    //            database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).remove();
-  //          }, 2000);
+            setTimeout(() => {
+                database.ref('joinRequests/' + roomId + '/' + joinRequestPlayerId).remove();
+            }, 2000);
 
-    //        pendingRequests--;
- //           updateNotificationBadge();
-    //        joinRequestPlayerId = null;
-   //     });
-//    }
-//}
+            pendingRequests--;
+            updateNotificationBadge();
+            joinRequestPlayerId = null;
+        });
+    }
+}
 
-// Update game state from room data - FIXED VERSION
+// Update game state from room data
 function updateGameFromRoomData(roomData) {
     if (!roomData) return;
 
@@ -1189,7 +1129,7 @@ function leaveRoom() {
     isRoomFull = false;
     playerId = null;
     isRoomCreator = false;
-    isSpectator = false; // <-- YEH NAYI LINE ADD KAREIN
+    isSpectator = false;
     joinRequestPlayerId = null;
     pendingRequests = 0;
     updateNotificationBadge();
@@ -1221,7 +1161,7 @@ function updateMaxRounds() {
     if (isMultiplayer && isConnected && !isRoomCreator) {
         log("Only the room creator can change the number of rounds");
         showAlert("Only the room creator can change the number of rounds");
-        bestOfEl.value = maxRounds.toString(); // Revert the change
+        bestOfEl.value = maxRounds.toString();
         return;
     }
 
